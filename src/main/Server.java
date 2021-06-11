@@ -15,7 +15,6 @@ public class Server {
         final int PORT = 6666;
 
         try {
-
             ServerSocket serverSocket = new ServerSocket(PORT);
 
             while (true) {

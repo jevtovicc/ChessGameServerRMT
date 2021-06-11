@@ -7,6 +7,7 @@ import java.io.PrintStream;
 import java.net.Socket;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class ClientThread extends Thread {
 
@@ -43,19 +44,25 @@ public class ClientThread extends Thread {
                     if (validateUsernameUnique(username)) {
                         this.username = username;
                         outputToClient.println("Username@OK");
+                        // Notify others that new player connected
+                        for (var ct : Server.onlinePlayers) {
+                            if (ct != this) {
+                                ct.outputToClient.println("NewOnlinePlayer@" + username);
+                            }
+                        }
                     } else {
                         outputToClient.println("Username@NOT_UNIQUE");
                     }
                 }
 
-                if (messageFromClient.toLowerCase().startsWith("quit")) {
-                    outputToClient.println("Goodbye " + username);
-                    break;
+                if (messageFromClient.startsWith("OnlinePlayers")) {
+                    outputToClient.println("OnlinePlayers@" + getPlayersUsernames());
                 }
 
             }
 
             Server.onlinePlayers.remove(this);
+            Server.onlinePlayers.forEach(x -> x.outputToClient.println("PlayerDisconnected@" + username));
             connSocket.close();
         } catch (IOException ex) {
             Logger.getLogger(ClientThread.class.getName()).log(Level.SEVERE, null, ex);
@@ -80,5 +87,14 @@ public class ClientThread extends Thread {
             }
         }
         return true;
+    }
+
+    private String getPlayersUsernames() {
+        return String.join(",",
+                Server.onlinePlayers
+                    .stream()
+                    .filter(x -> x != this)
+                    .map(x -> x.username)
+                    .collect(Collectors.toList()));
     }
 }
