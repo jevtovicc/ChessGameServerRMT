@@ -43,20 +43,43 @@ public class ClientThread extends Thread {
                     String username = messageFromClient.split("@")[1];
                     if (validateUsernameUnique(username)) {
                         this.username = username;
-                        outputToClient.println("Username@OK");
+                        outputToClient.println("Username@OK;" + username);
                         // Notify others that new player connected
-                        for (var ct : Server.onlinePlayers) {
-                            if (ct != this) {
-                                ct.outputToClient.println("NewOnlinePlayer@" + username);
-                            }
-                        }
+                        Server.onlinePlayers.stream()
+                                .filter(x -> x != this)
+                                .forEach(x -> x.outputToClient.println("NewOnlinePlayer@" + username));
+
                     } else {
-                        outputToClient.println("Username@NOT_UNIQUE");
+                        outputToClient.println("Username@NOT_UNIQUE;" + username);
                     }
                 }
 
                 if (messageFromClient.startsWith("OnlinePlayers")) {
                     outputToClient.println("OnlinePlayers@" + getPlayersUsernames());
+                }
+
+                if (messageFromClient.startsWith("GameRequest")) {
+                    String players = messageFromClient.split("@")[1];
+                    String sender = players.split(",")[0];
+                    String receiver = players.split(",")[1];
+                    ClientThread ct = findByUsername(receiver);
+                    ct.outputToClient.println("GameRequest@" + sender);
+                }
+
+                if (messageFromClient.startsWith("InvitationAccept")) {
+                    String players = messageFromClient.split("@")[1];
+                    String username = players.split(",")[0];
+                    String opponentUsername = players.split(",")[1];
+                    ClientThread ct = findByUsername(opponentUsername);
+                    ct.outputToClient.println("InvitationAccept@" + username);
+                }
+
+                if (messageFromClient.startsWith("InvitationReject")) {
+                    String players = messageFromClient.split("@")[1];
+                    String rejecter = players.split(",")[0];
+                    String sender = players.split(",")[1];
+                    ClientThread ct = findByUsername(sender);
+                    ct.outputToClient.println("InvitationReject@" + rejecter);
                 }
 
             }
@@ -96,5 +119,12 @@ public class ClientThread extends Thread {
                     .filter(x -> x != this)
                     .map(x -> x.username)
                     .collect(Collectors.toList()));
+    }
+
+    private ClientThread findByUsername(String username) {
+        return Server.onlinePlayers.stream()
+                .filter(x -> username.equals(x.username))
+                .findFirst()
+                .get();
     }
 }
