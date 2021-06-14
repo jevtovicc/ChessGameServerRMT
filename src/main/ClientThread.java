@@ -35,7 +35,9 @@ public class ClientThread extends Thread {
 
                 String messageFromClient = inputFromClient.readLine();
 
-                if (messageFromClient == null) {
+                if (messageFromClient == null) break;
+                if (messageFromClient.startsWith("quit")) {
+                    outputToClient.println("Goodbye");
                     break;
                 }
 
@@ -87,6 +89,7 @@ public class ClientThread extends Thread {
             Server.onlinePlayers.remove(this);
             Server.onlinePlayers.forEach(x -> x.outputToClient.println("PlayerDisconnected@" + username));
             connSocket.close();
+            System.out.println("Client disconnected and connection closed");
         } catch (IOException ex) {
             Logger.getLogger(ClientThread.class.getName()).log(Level.SEVERE, null, ex);
         }
