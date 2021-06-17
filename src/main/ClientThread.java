@@ -84,6 +84,17 @@ public class ClientThread extends Thread {
                     ct.outputToClient.println("InvitationReject@" + rejecter);
                 }
 
+                if (messageFromClient.startsWith("MoveMade")) {
+                    String[] infos = messageFromClient.split("@")[1].split(",");
+                    String opponentUsername = infos[0];
+                    String srcCol = infos[1];
+                    String srcRow = infos[2];
+                    String destCol = infos[3];
+                    String destRow = infos[4];
+                    ClientThread ct = findByUsername(opponentUsername);
+                    ct.outputToClient.println("MoveMade@" + srcCol + "," + srcRow + "," + destCol + "," + destRow);
+                }
+
             }
 
             Server.onlinePlayers.remove(this);
