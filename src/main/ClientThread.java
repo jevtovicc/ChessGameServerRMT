@@ -15,6 +15,7 @@ public class ClientThread extends Thread {
     private String username;
     private BufferedReader inputFromClient;
     private PrintStream outputToClient;
+    private boolean isInGame;
 
     public ClientThread(Socket connSocket) {
         this.connSocket = connSocket;
@@ -37,6 +38,18 @@ public class ClientThread extends Thread {
 
                 if (messageFromClient == null) break;
                 if (messageFromClient.startsWith("quit")) {
+                    if (isInGame) {
+                        String opponentUsername = messageFromClient.split("@")[1];
+                        ClientThread winner = findByUsername(opponentUsername);
+                        winner.outputToClient.println("OpponentDisconnected");
+                        winner.isInGame = false;
+                        Server.onlinePlayers.stream()
+                                .filter(x -> x != winner && x != this)
+                                .forEach(x -> {
+                                    x.outputToClient.println("NewOnlinePlayer@" + opponentUsername);
+                                    x.outputToClient.println("NewOnlinePlayer@" + username);
+                                });
+                    }
                     outputToClient.println("Goodbye");
                     break;
                 }
@@ -48,7 +61,7 @@ public class ClientThread extends Thread {
                         outputToClient.println("Username@OK;" + username);
                         // Notify others that new player connected
                         Server.onlinePlayers.stream()
-                                .filter(x -> x != this)
+                                .filter(x -> x != this && !x.isInGame)
                                 .forEach(x -> x.outputToClient.println("NewOnlinePlayer@" + username));
 
                     } else {
@@ -57,7 +70,7 @@ public class ClientThread extends Thread {
                 }
 
                 if (messageFromClient.startsWith("OnlinePlayers")) {
-                    outputToClient.println("OnlinePlayers@" + getPlayersUsernames());
+                    outputToClient.println("OnlinePlayers@" + getAvailablePlayersUsernames());
                 }
 
                 if (messageFromClient.startsWith("GameRequest")) {
@@ -72,8 +85,17 @@ public class ClientThread extends Thread {
                     String players = messageFromClient.split("@")[1];
                     String username = players.split(",")[0];
                     String opponentUsername = players.split(",")[1];
-                    ClientThread ct = findByUsername(opponentUsername);
-                    ct.outputToClient.println("InvitationAccept@" + username);
+                    ClientThread sender = findByUsername(opponentUsername);
+                    sender.outputToClient.println("InvitationAccept@" + username);
+                    sender.isInGame = true;
+                    ClientThread receiver = findByUsername(username);
+                    receiver.isInGame = true;
+                    Server.onlinePlayers.stream()
+                            .filter(x -> x != sender && x != receiver)
+                            .forEach(x -> {
+                                x.outputToClient.println("PlayerDisconnected@" + opponentUsername);
+                                x.outputToClient.println("PlayerDisconnected@" + username);
+                            });
                 }
 
                 if (messageFromClient.startsWith("InvitationReject")) {
@@ -93,6 +115,24 @@ public class ClientThread extends Thread {
                     String destRow = infos[4];
                     ClientThread ct = findByUsername(opponentUsername);
                     ct.outputToClient.println("MoveMade@" + srcCol + "," + srcRow + "," + destCol + "," + destRow);
+                }
+
+                if (messageFromClient.startsWith("GameOver")) {
+                    String[] players = messageFromClient.split("@")[1].split(";");
+                    String winnerUsername = players[0];
+                    String loserUsername = players[1];
+                    ClientThread winnerCt = findByUsername(winnerUsername);
+                    ClientThread loserCt = findByUsername(loserUsername);
+                    winnerCt.outputToClient.println("GameWon");
+                    winnerCt.isInGame = false;
+                    loserCt.outputToClient.println("GameLost");
+                    loserCt.isInGame = false;
+                    Server.onlinePlayers.stream()
+                            .filter(x -> x != winnerCt && x != loserCt)
+                            .forEach(x -> {
+                                x.outputToClient.println("NewOnlinePlayer@" + winnerUsername);
+                                x.outputToClient.println("NewOnlinePlayer@" + loserUsername);
+                            });
                 }
 
             }
@@ -126,11 +166,11 @@ public class ClientThread extends Thread {
         return true;
     }
 
-    private String getPlayersUsernames() {
+    private String getAvailablePlayersUsernames() {
         return String.join(",",
                 Server.onlinePlayers
                     .stream()
-                    .filter(x -> x != this)
+                    .filter(x -> x != this && !x.isInGame)
                     .map(x -> x.username)
                     .collect(Collectors.toList()));
     }
