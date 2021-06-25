@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 public class ClientThread extends Thread {
 
-    private Socket connSocket;
+    private final Socket connSocket;
     private String username;
     private BufferedReader inputFromClient;
     private PrintStream outputToClient;
@@ -22,8 +22,6 @@ public class ClientThread extends Thread {
     }
 
     public String getUsername() { return username; }
-    public BufferedReader getInputFromClient() { return inputFromClient; }
-    public PrintStream getOutputToClient() { return outputToClient; }
 
     @Override
     public void run() {
@@ -37,12 +35,15 @@ public class ClientThread extends Thread {
                 String messageFromClient = inputFromClient.readLine();
 
                 if (messageFromClient == null) break;
+
                 if (messageFromClient.startsWith("quit")) {
+                    /* if is in game, notify his opponent that player disconnected */
                     if (isInGame) {
                         String opponentUsername = messageFromClient.split("@")[1];
                         ClientThread winner = findByUsername(opponentUsername);
                         winner.outputToClient.println("OpponentDisconnected");
                         winner.isInGame = false;
+                        /* add winner to available players list, so others can connect with him */
                         Server.onlinePlayers.stream()
                                 .filter(x -> x != winner && x != this)
                                 .forEach(x -> {
@@ -63,7 +64,6 @@ public class ClientThread extends Thread {
                         Server.onlinePlayers.stream()
                                 .filter(x -> x != this && !x.isInGame)
                                 .forEach(x -> x.outputToClient.println("NewOnlinePlayer@" + username));
-
                     } else {
                         outputToClient.println("Username@NOT_UNIQUE;" + username);
                     }
@@ -90,6 +90,7 @@ public class ClientThread extends Thread {
                     sender.isInGame = true;
                     ClientThread receiver = findByUsername(username);
                     receiver.isInGame = true;
+                    /* remove these two players from available players list */
                     Server.onlinePlayers.stream()
                             .filter(x -> x != sender && x != receiver)
                             .forEach(x -> {
@@ -107,12 +108,13 @@ public class ClientThread extends Thread {
                 }
 
                 if (messageFromClient.startsWith("MoveMade")) {
-                    String[] infos = messageFromClient.split("@")[1].split(",");
-                    String opponentUsername = infos[0];
-                    String srcCol = infos[1];
-                    String srcRow = infos[2];
-                    String destCol = infos[3];
-                    String destRow = infos[4];
+                    /* parts format: opponentUsername,srcCol, srcRow,destCol,destRow */
+                    String[] parts = messageFromClient.split("@")[1].split(",");
+                    String opponentUsername = parts[0];
+                    String srcCol = parts[1];
+                    String srcRow = parts[2];
+                    String destCol = parts[3];
+                    String destRow = parts[4];
                     ClientThread ct = findByUsername(opponentUsername);
                     ct.outputToClient.println("MoveMade@" + srcCol + "," + srcRow + "," + destCol + "," + destRow);
                 }
@@ -127,6 +129,8 @@ public class ClientThread extends Thread {
                     winnerCt.isInGame = false;
                     loserCt.outputToClient.println("GameLost");
                     loserCt.isInGame = false;
+
+                    /* add two players to available players list, so others can connect with them */
                     Server.onlinePlayers.stream()
                             .filter(x -> x != winnerCt && x != loserCt)
                             .forEach(x -> {
@@ -138,6 +142,7 @@ public class ClientThread extends Thread {
             }
 
             Server.onlinePlayers.remove(this);
+            /* notify others that player disconnected */
             Server.onlinePlayers.forEach(x -> x.outputToClient.println("PlayerDisconnected@" + username));
             connSocket.close();
             System.out.println("Client disconnected and connection closed");
@@ -158,21 +163,17 @@ public class ClientThread extends Thread {
     }
 
     private boolean validateUsernameUnique(String username) {
-        for (var ct : Server.onlinePlayers) {
-            if (username.equals(ct.getUsername())) {
-                return false;
-            }
-        }
-        return true;
+        return Server.onlinePlayers
+                .stream()
+                .noneMatch(ct -> username.equals(ct.getUsername()));
     }
 
     private String getAvailablePlayersUsernames() {
-        return String.join(",",
-                Server.onlinePlayers
-                    .stream()
-                    .filter(x -> x != this && !x.isInGame)
-                    .map(x -> x.username)
-                    .collect(Collectors.toList()));
+        return Server.onlinePlayers
+            .stream()
+            .filter(x -> x != this && !x.isInGame)
+            .map(x -> x.username)
+            .collect(Collectors.joining(","));
     }
 
     private ClientThread findByUsername(String username) {
