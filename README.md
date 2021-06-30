@@ -1,0 +1,2 @@
+# ChessGameServerRMT
+This is readme
