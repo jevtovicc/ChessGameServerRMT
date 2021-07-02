@@ -91,11 +91,10 @@ public class ClientThread extends Thread {
                 else if (messageFromClient.startsWith("MoveMade")) {
                     /* parts format: opponentUsername,srcCol, srcRow,destCol,destRow */
                     String[] parts = messageFromClient.split("@")[1].split(",");
-                    String opponentUsername = parts[0];
-                    String srcCol = parts[1];
-                    String srcRow = parts[2];
-                    String destCol = parts[3];
-                    String destRow = parts[4];
+                    String srcCol = parts[0];
+                    String srcRow = parts[1];
+                    String destCol = parts[2];
+                    String destRow = parts[3];
 
                     ClientThread ct = findByUsername(opponentUsername);
                     ct.outputToClient.println("MoveMade@" + srcCol + "," + srcRow + "," + destCol + "," + destRow);
@@ -114,7 +113,7 @@ public class ClientThread extends Thread {
                     Server.onlinePlayers.stream()
                             .filter(x -> x != winner && x != this)
                             .forEach(x -> {
-                                x.outputToClient.println("NewOnlinePlayer@" + winner.username);
+                                x.outputToClient.println("NewOnlinePlayer@" + opponentUsername);
                                 x.outputToClient.println("NewOnlinePlayer@" + username);
                             });
                 }
